@@ -1,11 +1,9 @@
-import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import Link from "next/link";
-import { getOrganizations, isSuperAdmin } from "@/lib/organizations";
+import { createClient } from "@/lib/supabase/server";
+import { isSuperAdminEmail, getOrganizations } from "@/lib/organizations";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
-
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -14,30 +12,25 @@ export default async function DashboardPage() {
     redirect("/login");
   }
 
-  // Sprawdź czy to super admin i przekieruj
-  const isSuper = await isSuperAdmin(user.id);
-  if (isSuper) {
-    redirect("/admin/dashboard");
+  if (isSuperAdminEmail(user.email ?? "")) {
+    redirect("/admin");
   }
 
   const organizations = await getOrganizations();
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white shadow-sm">
+      {/* Navbar */}
+      <nav className="bg-white border-b border-gray-200">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 justify-between">
-            <div className="flex">
-              <div className="flex flex-shrink-0 items-center">
-                <h1 className="text-xl font-bold">Dashboard</h1>
-              </div>
-            </div>
+          <div className="flex h-16 items-center justify-between">
+            <h1 className="text-lg font-semibold text-gray-900">Dashboard</h1>
             <div className="flex items-center gap-4">
-              <span className="text-sm text-gray-700">{user.email}</span>
+              <span className="text-sm text-gray-500">{user.email}</span>
               <form action="/auth/signout" method="post">
                 <button
                   type="submit"
-                  className="rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500"
+                  className="rounded-lg bg-red-50 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-100 transition"
                 >
                   Wyloguj
                 </button>
@@ -47,71 +40,77 @@ export default async function DashboardPage() {
         </div>
       </nav>
 
-      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+      {/* Main */}
+      <main className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
         <div className="mb-8">
-          <h2 className="text-2xl font-bold text-gray-900">Witaj!</h2>
-          <p className="mt-2 text-gray-600">
-            Zarządzaj swoimi organizacjami i zespołami.
+          <h2 className="text-2xl font-bold text-gray-900">
+            Twoje organizacje
+          </h2>
+          <p className="mt-1 text-sm text-gray-500">
+            Organizacje, do których należysz.
           </p>
         </div>
 
-        <div className="grid gap-6">
-          <div className="rounded-lg bg-white p-6 shadow">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">
-                Twoje organizacje
-              </h3>
-              <Link
-                href="/organizations/new"
-                className="rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500"
+        {organizations.length === 0 ? (
+          <div className="rounded-xl border border-gray-200 bg-white p-12 text-center shadow-sm">
+            <p className="text-gray-400 text-sm">
+              Nie należysz jeszcze do żadnej organizacji.
+            </p>
+            <p className="mt-2 text-gray-400 text-sm">
+              Poczekaj aż administrator aktywuje Twoje konto.
+            </p>
+          </div>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {organizations.map((org) => (
+              <div
+                key={org.id}
+                className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm hover:border-blue-300 hover:shadow-md transition"
               >
-                + Nowa organizacja
-              </Link>
-            </div>
-
-            {organizations.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-gray-500 mb-4">
-                  Nie należysz do żadnej organizacji.
-                </p>
-                <p className="text-sm text-gray-400">
-                  Poczekaj na zaproszenie od administratora organizacji.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {organizations.map((org) => (
-                  <Link
-                    key={org.id}
-                    href={`/organizations/${org.id}`}
-                    className="block rounded-lg border border-gray-200 p-4 hover:border-blue-500 hover:bg-blue-50 transition-colors"
+                <div className="flex items-start justify-between">
+                  <div className="min-w-0">
+                    <h3 className="font-semibold text-gray-900 truncate">
+                      {org.name}
+                    </h3>
+                    <p className="mt-0.5 text-xs text-gray-400 font-mono">
+                      /{org.slug}
+                    </p>
+                  </div>
+                  <span
+                    className={`ml-3 shrink-0 inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                      org.status === "active"
+                        ? "bg-green-100 text-green-700"
+                        : org.status === "suspended"
+                          ? "bg-red-100 text-red-600"
+                          : "bg-gray-100 text-gray-600"
+                    }`}
                   >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h4 className="font-semibold text-gray-900">
-                          {org.name}
-                        </h4>
-                        <p className="text-sm text-gray-500">/{org.slug}</p>
-                      </div>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            )}
-          </div>
+                    {org.status === "active"
+                      ? "Aktywna"
+                      : org.status === "suspended"
+                        ? "Zawieszona"
+                        : "Nieaktywna"}
+                  </span>
+                </div>
 
-          <div className="rounded-lg bg-blue-50 p-6">
-            <h3 className="text-lg font-semibold text-blue-900 mb-2">
-              Jak działa multi-tenancy?
-            </h3>
-            <ul className="space-y-2 text-sm text-blue-800">
-              <li>• Każda organizacja ma własną izolowaną przestrzeń</li>
-              <li>• Row Level Security (RLS) zapewnia bezpieczeństwo danych</li>
-              <li>• Użytkownicy mogą należeć do wielu organizacji</li>
-              <li>• Różne role: owner, admin, member</li>
-            </ul>
+                {org.description && (
+                  <p className="mt-3 text-sm text-gray-500 line-clamp-2">
+                    {org.description}
+                  </p>
+                )}
+
+                <p className="mt-4 text-xs text-gray-400">
+                  Dołączono:{" "}
+                  {new Date(org.created_at).toLocaleDateString("pl-PL", {
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                  })}
+                </p>
+              </div>
+            ))}
           </div>
-        </div>
+        )}
       </main>
     </div>
   );
