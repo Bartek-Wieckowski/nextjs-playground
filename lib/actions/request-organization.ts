@@ -2,6 +2,7 @@
 
 import { createAdminClient } from '@/lib/supabase/admin'
 import { sendOrganizationRequestEmail } from '@/lib/email'
+import { logAudit } from '@/lib/audit'
 import { headers } from 'next/headers'
 
 export type RequestFormState = {
@@ -40,20 +41,28 @@ export async function submitOrganizationRequest(
       organization_name: organizationName,
       description: description || null,
     })
-    .select('token')
+    .select('id, token')
     .single()
 
-  if (dbError) {
+  if (dbError || !orgRequest) {
     console.error('DB error saving request:', dbError)
     return { success: false, error: 'Błąd zapisu. Spróbuj ponownie.' }
   }
+
+  await logAudit({
+    action: 'org_request_submitted',
+    table: 'organization_requests',
+    rowId: orgRequest.id,
+    changedBy: null,
+    newData: { email, organization_name: organizationName },
+  })
 
   // Buduj URL do zatwierdzenia
   const headersList = await headers()
   const host = headersList.get('host') ?? 'localhost:3000'
   const protocol = host.startsWith('localhost') ? 'http' : 'https'
   const origin = `${protocol}://${host}`
-  const approveUrl = `${origin}/api/approve-organization?token=${orgRequest.token}`
+  const approveUrl = `${origin}/approve-organization?token=${orgRequest.token}`
 
   // Wyślij email do właściciela firmy
   try {

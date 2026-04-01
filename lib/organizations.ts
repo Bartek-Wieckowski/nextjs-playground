@@ -1,3 +1,4 @@
+import slugify from "slugify";
 import { createClient } from "@/lib/supabase/server";
 import type {
   Organization,
@@ -139,14 +140,7 @@ export async function getUserOrganizationRole(
  * Generuj slug z nazwy organizacji
  */
 export function generateSlug(name: string): string {
-  return name
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9\s-]/g, "")
-    .trim()
-    .replace(/\s+/g, "-")
-    .replace(/-+/g, "-");
+  return slugify(name, { lower: true, strict: true });
 }
 
 /**
@@ -155,15 +149,4 @@ export function generateSlug(name: string): string {
 export async function isOrgAdmin(organizationId: string): Promise<boolean> {
   const role = await getUserOrganizationRole(organizationId);
   return role === "admin";
-}
-
-/**
- * Sprawdź czy email należy do super admina
- */
-export function isSuperAdminEmail(email: string): boolean {
-  const emails = (process.env.SUPER_ADMIN_EMAIL ?? "")
-    .split(",")
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean);
-  return emails.includes(email.toLowerCase());
 }

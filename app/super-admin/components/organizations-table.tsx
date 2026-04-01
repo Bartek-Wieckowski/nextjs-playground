@@ -4,23 +4,24 @@ import { useActionState, useState, useTransition } from "react";
 import {
   createOrganization,
   updateOrganization,
-  deleteOrganization,
+  softDeleteOrganization,
+  restoreOrganization,
   type OrgActionState,
-} from "@/lib/actions/admin-organizations";
+} from "@/lib/actions/organizations";
 import type { Organization } from "@/lib/types";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
 const STATUS_STYLES: Record<string, string> = {
   active: "bg-green-100 text-green-700",
-  inactive: "bg-gray-100 text-gray-600",
   suspended: "bg-red-100 text-red-600",
+  cancelled: "bg-gray-100 text-gray-600",
 };
 
 const STATUS_LABELS: Record<string, string> = {
   active: "Aktywna",
-  inactive: "Nieaktywna",
   suspended: "Zawieszona",
+  cancelled: "Anulowana",
 };
 
 function StatusBadge({ status }: { status: string }) {
@@ -73,7 +74,7 @@ function CreateForm({ onSuccess }: { onSuccess: () => void }) {
             type="text"
             required
             placeholder="Acme Corp"
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
           />
         </div>
         <div>
@@ -84,7 +85,7 @@ function CreateForm({ onSuccess }: { onSuccess: () => void }) {
             name="slug"
             type="text"
             placeholder="acme-corp"
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
           />
         </div>
         <div>
@@ -95,7 +96,7 @@ function CreateForm({ onSuccess }: { onSuccess: () => void }) {
             name="description"
             type="text"
             placeholder="Opcjonalny opis..."
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
           />
         </div>
         <div>
@@ -105,11 +106,11 @@ function CreateForm({ onSuccess }: { onSuccess: () => void }) {
           <select
             name="status"
             defaultValue="active"
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
           >
             <option value="active">Aktywna</option>
-            <option value="inactive">Nieaktywna</option>
             <option value="suspended">Zawieszona</option>
+            <option value="cancelled">Anulowana</option>
           </select>
         </div>
       </div>
@@ -118,7 +119,7 @@ function CreateForm({ onSuccess }: { onSuccess: () => void }) {
         <p className="mt-3 text-sm text-red-600">{state.error}</p>
       )}
 
-      <div className="mt-4 flex items-center gap-3">
+      <div className="mt-4">
         <button
           type="submit"
           disabled={isPending}
@@ -168,7 +169,7 @@ function EditRow({
                 type="text"
                 required
                 defaultValue={org.name}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
               />
             </div>
             <div>
@@ -180,7 +181,7 @@ function EditRow({
                 type="text"
                 required
                 defaultValue={org.slug}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
               />
             </div>
             <div>
@@ -191,7 +192,7 @@ function EditRow({
                 name="description"
                 type="text"
                 defaultValue={org.description ?? ""}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
               />
             </div>
             <div>
@@ -201,11 +202,11 @@ function EditRow({
               <select
                 name="status"
                 defaultValue={org.status}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
               >
                 <option value="active">Aktywna</option>
-                <option value="inactive">Nieaktywna</option>
                 <option value="suspended">Zawieszona</option>
+                <option value="cancelled">Anulowana</option>
               </select>
             </div>
           </div>
@@ -243,16 +244,12 @@ function DeleteButton({ id, name }: { id: string; name: string }) {
   const [error, setError] = useState<string | null>(null);
 
   function handleDelete() {
-    if (
-      !window.confirm(
-        `Czy na pewno chcesz usunąć organizację "${name}"?\n\nTej operacji nie można cofnąć.`,
-      )
-    ) {
+    if (!window.confirm(`Czy na pewno chcesz usunąć organizację "${name}"?\n\nOrganizacja zostanie przeniesiona do kosza.`)) {
       return;
     }
     setError(null);
     startTransition(async () => {
-      const result = await deleteOrganization(id);
+      const result = await softDeleteOrganization(id);
       if (!result.success) setError(result.error ?? "Błąd usuwania.");
     });
   }
@@ -271,37 +268,80 @@ function DeleteButton({ id, name }: { id: string; name: string }) {
   );
 }
 
-// ── OrganizationsTable ────────────────────────────────────────────────────────
+// ── RestoreButton ─────────────────────────────────────────────────────────────
 
-export function OrganizationsTable({
-  initialOrganizations,
-}: {
-  initialOrganizations: Organization[];
-}) {
-  const [showCreateForm, setShowCreateForm] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
+function RestoreButton({ id, name }: { id: string; name: string }) {
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  function handleRestore() {
+    setError(null);
+    startTransition(async () => {
+      const result = await restoreOrganization(id);
+      if (!result.success) setError(result.error ?? "Błąd przywracania.");
+    });
+  }
 
   return (
     <div>
-      {/* Toolbar */}
+      <button
+        onClick={handleRestore}
+        disabled={isPending}
+        className="rounded-lg px-3 py-1.5 text-sm font-medium text-green-600 hover:bg-green-50 disabled:opacity-50 transition"
+        title={`Przywróć ${name}`}
+      >
+        {isPending ? "Przywracanie..." : "Przywróć"}
+      </button>
+      {error && <p className="text-xs text-red-600 mt-1">{error}</p>}
+    </div>
+  );
+}
+
+// ── OrganizationsTable ────────────────────────────────────────────────────────
+
+export function OrganizationsTable({
+  organizations,
+  deletedOrganizations,
+}: {
+  organizations: Organization[];
+  deletedOrganizations: Organization[];
+}) {
+  const [tab, setTab] = useState<"active" | "deleted">("active");
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+
+  const current = tab === "active" ? organizations : deletedOrganizations;
+
+  return (
+    <div>
+      {/* Tabs + toolbar */}
       <div className="mb-4 flex items-center justify-between">
-        <p className="text-sm text-gray-500">
-          {initialOrganizations.length}{" "}
-          {initialOrganizations.length === 1 ? "organizacja" : "organizacji"}
-        </p>
-        <button
-          onClick={() => {
-            setShowCreateForm((v) => !v);
-            setEditingId(null);
-          }}
-          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition"
-        >
-          {showCreateForm ? "Anuluj" : "+ Nowa organizacja"}
-        </button>
+        <div className="flex gap-1 rounded-lg bg-gray-100 p-1">
+          <button
+            onClick={() => { setTab("active"); setShowCreateForm(false); setEditingId(null); }}
+            className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${tab === "active" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
+          >
+            Aktywne ({organizations.length})
+          </button>
+          <button
+            onClick={() => { setTab("deleted"); setShowCreateForm(false); setEditingId(null); }}
+            className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${tab === "deleted" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
+          >
+            Usunięte ({deletedOrganizations.length})
+          </button>
+        </div>
+        {tab === "active" && (
+          <button
+            onClick={() => { setShowCreateForm((v) => !v); setEditingId(null); }}
+            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition"
+          >
+            {showCreateForm ? "Anuluj" : "+ Nowa organizacja"}
+          </button>
+        )}
       </div>
 
       {/* Create form */}
-      {showCreateForm && (
+      {tab === "active" && showCreateForm && (
         <CreateForm onSuccess={() => setShowCreateForm(false)} />
       )}
 
@@ -310,40 +350,26 @@ export function OrganizationsTable({
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                Nazwa
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                Slug
-              </th>
-              <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 md:table-cell">
-                Opis
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                Status
-              </th>
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Nazwa</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Slug</th>
+              <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 md:table-cell">Opis</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Status</th>
               <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 lg:table-cell">
-                Utworzona
+                {tab === "deleted" ? "Usunięta" : "Utworzona"}
               </th>
-              <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">
-                Akcje
-              </th>
+              <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">Akcje</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {initialOrganizations.length === 0 ? (
+            {current.length === 0 ? (
               <tr>
-                <td
-                  colSpan={6}
-                  className="px-4 py-12 text-center text-sm text-gray-400"
-                >
-                  Brak organizacji. Kliknij &bdquo;+ Nowa organizacja&rdquo; aby
-                  dodać pierwszą.
+                <td colSpan={6} className="px-4 py-12 text-center text-sm text-gray-400">
+                  {tab === "deleted" ? "Brak usuniętych organizacji." : "Brak organizacji. Kliknij \u201e+ Nowa organizacja\u201d aby dodać pierwszą."}
                 </td>
               </tr>
             ) : (
-              initialOrganizations.map((org) =>
-                editingId === org.id ? (
+              current.map((org) =>
+                tab === "active" && editingId === org.id ? (
                   <EditRow
                     key={org.id}
                     org={org}
@@ -351,39 +377,33 @@ export function OrganizationsTable({
                     onCancel={() => setEditingId(null)}
                   />
                 ) : (
-                  <tr
-                    key={org.id}
-                    className="hover:bg-gray-50 transition-colors"
-                  >
-                    <td className="px-4 py-3 text-sm font-medium text-gray-900">
-                      {org.name}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-500 font-mono">
-                      {org.slug}
-                    </td>
+                  <tr key={org.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-3 text-sm font-medium text-gray-900">{org.name}</td>
+                    <td className="px-4 py-3 text-sm text-gray-500 font-mono">{org.slug}</td>
                     <td className="hidden px-4 py-3 text-sm text-gray-500 max-w-xs truncate md:table-cell">
-                      {org.description ?? (
-                        <span className="text-gray-300">—</span>
-                      )}
+                      {org.description ?? <span className="text-gray-300">—</span>}
                     </td>
                     <td className="px-4 py-3">
                       <StatusBadge status={org.status} />
                     </td>
                     <td className="hidden px-4 py-3 text-sm text-gray-500 lg:table-cell">
-                      {formatDate(org.created_at)}
+                      {formatDate(tab === "deleted" ? (org.deleted_at ?? org.created_at) : org.created_at)}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-1">
-                        <button
-                          onClick={() => {
-                            setEditingId(org.id);
-                            setShowCreateForm(false);
-                          }}
-                          className="rounded-lg px-3 py-1.5 text-sm font-medium text-blue-600 hover:bg-blue-50 transition"
-                        >
-                          Edytuj
-                        </button>
-                        <DeleteButton id={org.id} name={org.name} />
+                        {tab === "active" ? (
+                          <>
+                            <button
+                              onClick={() => { setEditingId(org.id); setShowCreateForm(false); }}
+                              className="rounded-lg px-3 py-1.5 text-sm font-medium text-blue-600 hover:bg-blue-50 transition"
+                            >
+                              Edytuj
+                            </button>
+                            <DeleteButton id={org.id} name={org.name} />
+                          </>
+                        ) : (
+                          <RestoreButton id={org.id} name={org.name} />
+                        )}
                       </div>
                     </td>
                   </tr>

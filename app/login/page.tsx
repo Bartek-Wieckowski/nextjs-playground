@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { MagicLinkForm } from "./magic-link-form";
 
 export default function LoginPage() {
@@ -13,7 +14,9 @@ export default function LoginPage() {
           </p>
         </div>
 
-        <MagicLinkForm />
+        <Suspense>
+          <MagicLinkForm />
+        </Suspense>
       </div>
     </div>
   );
